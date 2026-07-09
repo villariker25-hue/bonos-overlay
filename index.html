@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de bonos</title>
+<style>
+  :root{ --dorado:#a78bfa; --fondo:#12101f; --tarjeta:#1e1b30; }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh; background:var(--fondo);
+    font-family:"Segoe UI", Arial, sans-serif; color:#eee;
+    display:flex; justify-content:center; padding:24px 12px;
+  }
+  main{ width:100%; max-width:520px; }
+  h1{ font-size:22px; color:var(--dorado); margin:0 0 16px; }
+  form{
+    display:flex; gap:8px; margin-bottom:16px;
+  }
+  input{
+    background:var(--tarjeta); border:1px solid #3a3560; border-radius:10px;
+    color:#fff; font-size:16px; padding:12px;
+  }
+  #caja-nombre{ flex:1; min-width:0; position:relative; }
+  #nombre{ width:100%; }
+  #precio{ width:110px; }
+  #sugerencias{
+    position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:10;
+    background:var(--tarjeta); border:1px solid #3a3560; border-radius:10px;
+    max-height:280px; overflow-y:auto; display:none;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  #sugerencias button{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    width:100%; text-align:left; background:transparent; color:#eee;
+    font-size:15px; font-weight:500; padding:10px 12px; border-radius:0;
+  }
+  #sugerencias button:hover{ background:#2a2545; }
+  #sugerencias .prov{
+    font-size:11px; font-weight:700; letter-spacing:.5px; white-space:nowrap;
+  }
+  #sugerencias button span:first-child{
+    flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  #sugerencias .varios{
+    font-size:11px; font-weight:700; color:var(--dorado); white-space:nowrap;
+  }
+  .titulo-variantes{
+    padding:8px 12px; font-size:12px; color:#888;
+    border-bottom:1px solid #2a2545;
+  }
+  .prov-Pragmatic{ color:#fbbf24; }
+  .prov-Hacksaw{ color:#34d399; }
+  .prov-Nolimit{ color:#f87171; }
+  button{
+    border:none; border-radius:10px; cursor:pointer; font-size:16px; font-weight:700;
+  }
+  #anadir{ background:var(--dorado); color:#171130; padding:12px 18px; }
+  #anadir:active{ transform:scale(.97); }
+  #resumen{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:12px; font-size:15px; color:#bbb;
+  }
+  #resumen b{ color:var(--dorado); }
+  #vaciar{ background:#3a2030; color:#ff8fa0; padding:6px 12px; font-size:13px; }
+  ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  li{
+    background:var(--tarjeta); border-radius:10px; padding:10px 14px;
+    display:flex; align-items:center; gap:10px;
+    border-left:4px solid var(--dorado);
+  }
+  li .n{ flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  li .p{ color:var(--dorado); font-weight:700; white-space:nowrap; }
+  li button{ background:transparent; color:#ff8fa0; font-size:18px; padding:2px 6px; }
+  #vacio{ color:#777; text-align:center; padding:24px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎰 Panel de bonos</h1>
+  <form id="formulario">
+    <div id="caja-nombre">
+      <input id="nombre" placeholder="Busca la slot…" autocomplete="off" autofocus>
+      <div id="sugerencias"></div>
+    </div>
+    <input id="precio" placeholder="50€" autocomplete="off">
+    <button id="anadir" type="submit">Añadir</button>
+  </form>
+  <div id="resumen">
+    <span>Bonos: <b id="num">0</b> · Total: <b id="total">0€</b></span>
+    <button id="vaciar" type="button">Vaciar todo</button>
+  </div>
+  <ul id="lista"></ul>
+  <p id="vacio">No hay bonos apuntados todavía.</p>
+</main>
+
+<script>
+// ── Firebase (misma base que la app de gastos, apartado propio) ──
+const API_KEY = "AIzaSyDdB36I8wdRiHkBwOi-HqMnCd_CRBd2NAI";
+const DB   = "https://gastos-casa-2b557-default-rtdb.europe-west1.firebasedatabase.app";
+const RUTA = "hogares/bonos-overlay-ik3v7q/bonos";
+
+async function tokenFirebase(){
+  const guardado = JSON.parse(localStorage.getItem("tokenBonos") || "null");
+  if (guardado && Date.now() < guardado.caduca) return guardado.token;
+  const a = await (await fetch(
+    "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + API_KEY,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+  )).json();
+  const nuevo = { token: a.idToken,
+                  caduca: Date.now() + (parseInt(a.expiresIn || "3600", 10) - 300) * 1000 };
+  localStorage.setItem("tokenBonos", JSON.stringify(nuevo));
+  return nuevo.token;
+}
+
+async function nube(metodo, sub = "", cuerpo = null, reintento = false){
+  const t = await tokenFirebase();
+  const r = await fetch(`${DB}/${RUTA}${sub}.json?auth=${t}`,
+    { method: metodo, body: cuerpo === null ? undefined : JSON.stringify(cuerpo) });
+  if (r.status === 401 && !reintento){
+    localStorage.removeItem("tokenBonos");     // token caducado: renovar una vez
+    return nube(metodo, sub, cuerpo, true);
+  }
+  return r.json();
+}
+
+function aLista(obj){
+  return Object.entries(obj || {})
+    .map(([id, b]) => ({ id, ...b }))
+    .sort((x, y) => (x.t || 0) - (y.t || 0));
+}
+
+// ── Interfaz ──
+const lista  = document.getElementById("lista");
+const vacio  = document.getElementById("vacio");
+
+function extraerImporte(texto){
+  const m = String(texto).replace(",", ".").match(/\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : 0;
+}
+
+function pintar(bonos){
+  lista.innerHTML = "";
+  vacio.style.display = bonos.length ? "none" : "block";
+  document.getElementById("num").textContent = bonos.length;
+  const total = bonos.reduce((s, b) => s + extraerImporte(b.precio), 0);
+  document.getElementById("total").textContent = (Math.round(total * 100) / 100) + "€";
+
+  for (const b of bonos){
+    const li = document.createElement("li");
+    const n = document.createElement("span"); n.className = "n"; n.textContent = b.nombre;
+    const p = document.createElement("span"); p.className = "p"; p.textContent = b.precio || "";
+    const x = document.createElement("button"); x.textContent = "✕"; x.title = "Eliminar";
+    x.onclick = () => nube("DELETE", "/" + b.id).then(recargar);
+    li.append(n, p, x);
+    lista.appendChild(li);
+  }
+}
+
+async function recargar(){
+  try{ pintar(aLista(await nube("GET"))); }
+  catch(e){ /* sin conexión: reintentar en el siguiente ciclo */ }
+}
+
+const nombre      = document.getElementById("nombre");
+const precio      = document.getElementById("precio");
+const sugerencias = document.getElementById("sugerencias");
+
+function precioFinal(){
+  let p = precio.value.trim();
+  if (p && /^\d+([.,]\d+)?$/.test(p)) p += "€";   // si es solo número, añadir €
+  return p;
+}
+
+async function anadirBono(nombreSlot){
+  await nube("POST", "", { nombre: nombreSlot, precio: precioFinal(), t: Date.now() });
+  nombre.value = ""; precio.value = "";
+  ocultarSugerencias();
+  nombre.focus();
+  recargar();
+}
+
+document.getElementById("formulario").onsubmit = (e) => {
+  e.preventDefault();
+  if (nombre.value.trim()) anadirBono(nombre.value.trim());
+};
+
+// ── Catálogo de slots (slots.json) con autocompletado ──
+let catalogo = [];
+fetch("slots.json").then(r => r.json()).then(datos => {
+  for (const [prov, lista] of Object.entries(datos))
+    for (const item of lista)
+      catalogo.push(typeof item === "string"
+        ? { nombre: item, prov, bonos: [] }
+        : { nombre: item.nombre, prov, bonos: item.bonos || [] });
+});
+
+const acentos = new RegExp("[\\u0300-\\u036f]", "g");
+const normalizar = (s) =>
+  s.toLowerCase().normalize("NFD").replace(acentos, "");
+
+function ocultarSugerencias(){
+  sugerencias.style.display = "none";
+  sugerencias.innerHTML = "";
+}
+
+nombre.addEventListener("input", () => {
+  const q = normalizar(nombre.value.trim());
+  if (q.length < 2){ ocultarSugerencias(); return; }
+  const coincidencias = catalogo
+    .filter(s => normalizar(s.nombre).includes(q))
+    .slice(0, 8);
+  if (!coincidencias.length){ ocultarSugerencias(); return; }
+
+  sugerencias.innerHTML = "";
+  for (const s of coincidencias){
+    const b = document.createElement("button");
+    b.type = "button";
+    const n = document.createElement("span"); n.textContent = s.nombre;
+    b.appendChild(n);
+    if (s.bonos.length){
+      const v = document.createElement("span");
+      v.className = "varios";
+      v.textContent = s.bonos.length + " bonos ▾";
+      b.appendChild(v);
+    }
+    const p = document.createElement("span");
+    p.className = "prov prov-" + s.prov; p.textContent = s.prov;
+    b.appendChild(p);
+    b.onclick = () => {
+      if (s.bonos.length) mostrarVariantes(s);
+      else elegir(s.nombre);
+    };
+    sugerencias.appendChild(b);
+  }
+  sugerencias.style.display = "block";
+});
+
+// Con el precio ya puesto, un clic añade el bono directamente;
+// si no, rellena el nombre y salta al precio.
+function elegir(nombreFinal){
+  if (precio.value.trim()) anadirBono(nombreFinal);
+  else { nombre.value = nombreFinal; ocultarSugerencias(); precio.focus(); }
+}
+
+// Segundo nivel: la slot tiene varios tipos de bono
+function mostrarVariantes(s){
+  sugerencias.innerHTML = "";
+  const titulo = document.createElement("div");
+  titulo.className = "titulo-variantes";
+  titulo.textContent = s.nombre + " — ¿qué bono?";
+  sugerencias.appendChild(titulo);
+  for (const bono of s.bonos){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = bono;
+    b.onclick = () => elegir(s.nombre + " — " + bono);
+    sugerencias.appendChild(b);
+  }
+  const sinTipo = document.createElement("button");
+  sinTipo.type = "button";
+  sinTipo.textContent = "Sin especificar";
+  sinTipo.style.color = "#888";
+  sinTipo.onclick = () => elegir(s.nombre);
+  sugerencias.appendChild(sinTipo);
+  sugerencias.style.display = "block";
+}
+
+nombre.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") ocultarSugerencias();
+});
+document.addEventListener("click", (e) => {
+  // Si el elemento clicado ya no está en la página, era una sugerencia
+  // reemplazada por el menú de variantes: no cerrar
+  if (!e.target.isConnected) return;
+  if (!document.getElementById("caja-nombre").contains(e.target))
+    ocultarSugerencias();
+});
+
+document.getElementById("vaciar").onclick = () => {
+  if (confirm("¿Borrar todos los bonos?")) nube("DELETE").then(recargar);
+};
+
+recargar();
+setInterval(recargar, 3000);
+</script>
+</body>
+</html>

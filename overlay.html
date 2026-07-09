@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Overlay bonos</title>
+<style>
+  /* ── Ajustes rápidos ─────────────────────────────────────────────
+     Por URL: ?v=45 (velocidad px/s)  ?total=0 (ocultar cabecera) */
+  :root{
+    --ancho: 480px;
+    --morado: #a78bfa;
+    --morado-claro: #c4b5fd;
+    --fondo-tarjeta: rgba(24, 16, 42, .72);
+    --borde: rgba(167, 139, 250, .35);
+  }
+
+  html, body{
+    margin: 0; height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+  #app{
+    width: var(--ancho);
+    height: 100vh;
+    margin: 0 auto;
+    display: flex; flex-direction: column;
+  }
+
+  /* Cabecera fija, discreta */
+  #cabecera{
+    flex: 0 0 auto;
+    margin: 6px 0 10px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: var(--fondo-tarjeta);
+    border: 1px solid var(--borde);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  #cabecera .titulo{
+    font-size: 13px; font-weight: 600; letter-spacing: 3px;
+    color: var(--morado);
+  }
+  #cabecera .datos{ font-size: 15px; font-weight: 600; color: #f5f3ff; }
+  #cabecera .datos b{ color: var(--morado-claro); font-weight: 700; }
+
+  /* Zona que gira, con desvanecido arriba y abajo */
+  #zona{
+    flex: 1 1 auto;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(transparent, #000 8%, #000 92%, transparent);
+            mask-image: linear-gradient(transparent, #000 8%, #000 92%, transparent);
+  }
+  #cinta{
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 8px 0;
+    will-change: transform;
+  }
+  /* Cada "juego" es la lista completa en 2 columnas: suben de dos en dos */
+  .juego{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .bono{
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--fondo-tarjeta);
+    border: 1px solid var(--borde);
+    min-width: 0;
+  }
+  .bono .nombre{
+    display: block;
+    color: #f5f3ff; font-size: 16px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 3px rgba(0,0,0,.7);
+  }
+  .bono .tipo{
+    display: block; margin-top: 1px;
+    color: var(--morado); font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 3px rgba(0,0,0,.7);
+  }
+  .bono .precio{
+    display: block; margin-top: 2px;
+    color: var(--morado-claro); font-size: 15px; font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0,0,0,.7);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="cabecera" style="display:none">
+    <span class="titulo">BONOS</span>
+    <span class="datos"><b id="num">0</b> · <b id="total">0€</b></span>
+  </div>
+  <div id="zona"><div id="cinta"></div></div>
+</div>
+
+<script>
+const params    = new URLSearchParams(location.search);
+const VELOCIDAD = parseFloat(params.get("v")) || 35;   // px por segundo
+const VER_TOTAL = params.get("total") !== "0";
+const GAP       = 10;
+
+const cabecera = document.getElementById("cabecera");
+const zona     = document.getElementById("zona");
+const cinta    = document.getElementById("cinta");
+let ultimoJson = "";
+let animacion  = null;
+
+function extraerImporte(texto){
+  const m = String(texto).replace(",", ".").match(/\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : 0;
+}
+
+function juego(bonos){
+  const div = document.createElement("div");
+  div.className = "juego";
+  for (const b of bonos){
+    const t = document.createElement("div");
+    t.className = "bono";
+    // "Slot — Tipo de bono" se parte en dos líneas
+    const sep = b.nombre.indexOf(" — ");
+    const principal = sep === -1 ? b.nombre : b.nombre.slice(0, sep);
+    const variante  = sep === -1 ? null : b.nombre.slice(sep + 3);
+    const nombre = document.createElement("span");
+    nombre.className = "nombre";
+    nombre.textContent = principal;
+    t.appendChild(nombre);
+    if (variante){
+      const tipo = document.createElement("span");
+      tipo.className = "tipo";
+      tipo.textContent = variante;
+      t.appendChild(tipo);
+    }
+    const precio = document.createElement("span");
+    precio.className = "precio";
+    precio.textContent = b.precio || "";
+    t.appendChild(precio);
+    div.appendChild(t);
+  }
+  return div;
+}
+
+function reconstruir(bonos){
+  if (animacion) { animacion.cancel(); animacion = null; }
+  cinta.innerHTML = "";
+
+  if (VER_TOTAL && bonos.length){
+    cabecera.style.display = "flex";
+    document.getElementById("num").textContent = bonos.length;
+    const total = bonos.reduce((suma, b) => suma + extraerImporte(b.precio), 0);
+    document.getElementById("total").textContent =
+      (Math.round(total * 100) / 100) + "€";
+  } else {
+    cabecera.style.display = "none";
+  }
+  if (!bonos.length) return;
+
+  // Un juego para medir su altura real
+  const primero = juego(bonos);
+  cinta.appendChild(primero);
+  const alturaJuego = primero.offsetHeight;
+
+  // Repetir hasta cubrir el doble de la pantalla (bucle sin huecos)
+  const copias = Math.max(2, Math.ceil((zona.clientHeight * 2) / alturaJuego) + 1);
+  for (let i = 1; i < copias; i++) cinta.appendChild(juego(bonos));
+
+  // Desplazar exactamente un juego y repetir: bucle infinito hacia arriba
+  const desplazamiento = alturaJuego + GAP;
+  animacion = cinta.animate(
+    [{ transform: "translateY(0)" }, { transform: `translateY(-${desplazamiento}px)` }],
+    { duration: (desplazamiento / VELOCIDAD) * 1000, iterations: Infinity, easing: "linear" }
+  );
+}
+
+// ── Firebase (misma base que la app de gastos, apartado propio) ──
+const API_KEY = "AIzaSyDdB36I8wdRiHkBwOi-HqMnCd_CRBd2NAI";
+const DB   = "https://gastos-casa-2b557-default-rtdb.europe-west1.firebasedatabase.app";
+const RUTA = "hogares/bonos-overlay-ik3v7q/bonos";
+
+async function tokenFirebase(){
+  const guardado = JSON.parse(localStorage.getItem("tokenBonos") || "null");
+  if (guardado && Date.now() < guardado.caduca) return guardado.token;
+  const a = await (await fetch(
+    "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + API_KEY,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+  )).json();
+  const nuevo = { token: a.idToken,
+                  caduca: Date.now() + (parseInt(a.expiresIn || "3600", 10) - 300) * 1000 };
+  localStorage.setItem("tokenBonos", JSON.stringify(nuevo));
+  return nuevo.token;
+}
+
+async function nube(reintento = false){
+  const t = await tokenFirebase();
+  const r = await fetch(`${DB}/${RUTA}.json?auth=${t}`);
+  if (r.status === 401 && !reintento){
+    localStorage.removeItem("tokenBonos");     // token caducado: renovar una vez
+    return nube(true);
+  }
+  return r.json();
+}
+
+function aLista(obj){
+  return Object.entries(obj || {})
+    .map(([id, b]) => ({ id, ...b }))
+    .sort((x, y) => (x.t || 0) - (y.t || 0));
+}
+
+async function refrescar(){
+  try{
+    const bonos = aLista(await nube());
+    const json = JSON.stringify(bonos);
+    if (json !== ultimoJson){
+      ultimoJson = json;
+      reconstruir(bonos);
+    }
+  }catch(e){ /* sin conexión: reintentar en el siguiente ciclo */ }
+}
+
+refrescar();
+setInterval(refrescar, 2000);
+
+// Si cambia el tamaño de la ventana (o de la fuente en OBS), reconstruir
+let temporizadorResize = null;
+window.addEventListener("resize", () => {
+  clearTimeout(temporizadorResize);
+  temporizadorResize = setTimeout(() => { ultimoJson = ""; refrescar(); }, 200);
+});
+</script>
+</body>
+</html>

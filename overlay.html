@@ -5,7 +5,9 @@
 <title>Overlay bonos</title>
 <style>
   /* ── Ajustes rápidos ─────────────────────────────────────────────
-     Por URL: ?v=45 (velocidad px/s)  ?total=0 (ocultar cabecera) */
+     Por URL: ?v=45 (velocidad px/s)  ?total=0 (ocultar contador)
+              ?bg=1 (pintar fondo morado como la maqueta; por defecto
+              el fondo es transparente para que se vea el stream) */
   :root{
     --ancho: 480px;
     /* Colores oficiales: degradado #B377FF → #7133F4, fondo #11091E */
@@ -22,38 +24,62 @@
     overflow: hidden;
     font-family: "Segoe UI", Arial, sans-serif;
   }
+  body.con-fondo{
+    background: linear-gradient(180deg, #392066 0%, #241243 55%, #170b30 100%);
+  }
   #app{
     width: var(--ancho);
     height: 100vh;
     margin: 0 auto;
+    padding: 10px 6px 14px;
+    box-sizing: border-box;
     display: flex; flex-direction: column;
   }
 
-  /* Cabecera fija, discreta */
-  #cabecera{
-    flex: 0 0 auto;
-    margin: 6px 0 10px;
-    padding: 8px 14px;
-    border-radius: 10px;
-    background: var(--fondo-tarjeta);
-    border: 1px solid var(--borde);
-    display: flex; justify-content: space-between; align-items: baseline;
+  /* Título BONOS estilo maqueta: serif grande con brillo */
+  #titulo{
+    text-align: center;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 42px; font-weight: 700; letter-spacing: 3px;
+    color: #fff;
+    text-shadow:
+      0 0 14px rgba(179, 119, 255, .55),
+      -2px 0 6px rgba(255, 90, 200, .28),
+       2px 0 6px rgba(90, 190, 255, .28);
+    margin: 0 0 4px;
   }
-  #cabecera .titulo{
-    font-size: 13px; font-weight: 700; letter-spacing: 3px;
-    background: linear-gradient(90deg, #B377FF, #7133F4);
-    -webkit-background-clip: text; background-clip: text;
-    color: transparent;
+  #contador{
+    text-align: center;
+    font-size: 14px; font-weight: 600;
+    color: #e6dcff;
+    margin-bottom: 8px;
   }
-  #cabecera .datos{ font-size: 15px; font-weight: 600; color: #f5f3ff; }
-  #cabecera .datos b{ color: var(--morado); font-weight: 700; }
+  #contador b{ color: var(--morado); }
+  #separador{
+    height: 1px; border: 0;
+    background: linear-gradient(90deg, transparent, rgba(179,119,255,.55), transparent);
+    margin: 0 6px 14px;
+  }
+
+  /* Marco de la maqueta: recuadro redondeado con borde discontinuo */
+  #marco{
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 2px dashed rgba(196, 160, 255, .45);
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(179,119,255,.07), rgba(113,51,244,.10));
+    padding: 12px 10px;
+    display: flex;
+    overflow: hidden;
+  }
 
   /* Zona que gira, con desvanecido arriba y abajo */
   #zona{
     flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
-    -webkit-mask-image: linear-gradient(transparent, #000 8%, #000 92%, transparent);
-            mask-image: linear-gradient(transparent, #000 8%, #000 92%, transparent);
+    -webkit-mask-image: linear-gradient(transparent, #000 7%, #000 93%, transparent);
+            mask-image: linear-gradient(transparent, #000 7%, #000 93%, transparent);
   }
   #cinta{
     display: flex; flex-direction: column; gap: 10px;
@@ -97,12 +123,13 @@
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="cabecera" style="display:none">
-    <span class="titulo">BONOS</span>
-    <span class="datos"><b id="num">0</b> · <b id="total">0€</b></span>
+<div id="app" style="display:none">
+  <div id="titulo">BONOS</div>
+  <div id="contador"><b id="num">0</b> · <b id="total">0€</b></div>
+  <hr id="separador">
+  <div id="marco">
+    <div id="zona"><div id="cinta"></div></div>
   </div>
-  <div id="zona"><div id="cinta"></div></div>
 </div>
 
 <script>
@@ -110,8 +137,10 @@ const params    = new URLSearchParams(location.search);
 const VELOCIDAD = parseFloat(params.get("v")) || 35;   // px por segundo
 const VER_TOTAL = params.get("total") !== "0";
 const GAP       = 10;
+if (params.get("bg") === "1") document.body.classList.add("con-fondo");
 
-const cabecera = document.getElementById("cabecera");
+const app      = document.getElementById("app");
+const contador = document.getElementById("contador");
 const zona     = document.getElementById("zona");
 const cinta    = document.getElementById("cinta");
 let ultimoJson = "";
@@ -155,16 +184,16 @@ function reconstruir(bonos){
   if (animacion) { animacion.cancel(); animacion = null; }
   cinta.innerHTML = "";
 
-  if (VER_TOTAL && bonos.length){
-    cabecera.style.display = "flex";
+  app.style.display = bonos.length ? "flex" : "none";
+  if (!bonos.length) return;
+
+  contador.style.display = VER_TOTAL ? "block" : "none";
+  if (VER_TOTAL){
     document.getElementById("num").textContent = bonos.length;
     const total = bonos.reduce((suma, b) => suma + extraerImporte(b.precio), 0);
     document.getElementById("total").textContent =
       (Math.round(total * 100) / 100) + "€";
-  } else {
-    cabecera.style.display = "none";
   }
-  if (!bonos.length) return;
 
   // Un juego para medir su altura real
   const primero = juego(bonos);

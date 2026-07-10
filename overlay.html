@@ -8,10 +8,12 @@
      Por URL: ?v=45 (velocidad px/s)  ?total=0 (ocultar cabecera) */
   :root{
     --ancho: 480px;
-    --morado: #a78bfa;
-    --morado-claro: #c4b5fd;
-    --fondo-tarjeta: rgba(24, 16, 42, .72);
-    --borde: rgba(167, 139, 250, .35);
+    /* Colores oficiales: degradado #B377FF → #7133F4, fondo #11091E */
+    --morado: #B377FF;
+    --morado-oscuro: #7133F4;
+    --degradado: linear-gradient(180deg, #B377FF, #7133F4);
+    --fondo-tarjeta: rgba(17, 9, 30, .72);
+    --borde: rgba(179, 119, 255, .35);
   }
 
   html, body{
@@ -38,11 +40,13 @@
     display: flex; justify-content: space-between; align-items: baseline;
   }
   #cabecera .titulo{
-    font-size: 13px; font-weight: 600; letter-spacing: 3px;
-    color: var(--morado);
+    font-size: 13px; font-weight: 700; letter-spacing: 3px;
+    background: linear-gradient(90deg, #B377FF, #7133F4);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
   }
   #cabecera .datos{ font-size: 15px; font-weight: 600; color: #f5f3ff; }
-  #cabecera .datos b{ color: var(--morado-claro); font-weight: 700; }
+  #cabecera .datos b{ color: var(--morado); font-weight: 700; }
 
   /* Zona que gira, con desvanecido arriba y abajo */
   #zona{
@@ -63,9 +67,13 @@
     gap: 10px;
   }
   .bono{
-    padding: 9px 12px;
+    padding: 9px 12px 9px 15px;
     border-radius: 10px;
-    background: var(--fondo-tarjeta);
+    /* Franja lateral con el degradado oficial sobre fondo #11091E translúcido */
+    background-color: var(--fondo-tarjeta);
+    background-image: var(--degradado);
+    background-size: 4px 100%;
+    background-repeat: no-repeat;
     border: 1px solid var(--borde);
     min-width: 0;
   }
@@ -77,13 +85,13 @@
   }
   .bono .tipo{
     display: block; margin-top: 1px;
-    color: var(--morado); font-size: 13px; font-weight: 600;
+    color: rgba(179, 119, 255, .85); font-size: 13px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     text-shadow: 0 1px 3px rgba(0,0,0,.7);
   }
   .bono .precio{
     display: block; margin-top: 2px;
-    color: var(--morado-claro); font-size: 15px; font-weight: 700;
+    color: var(--morado); font-size: 15px; font-weight: 700;
     text-shadow: 0 1px 3px rgba(0,0,0,.7);
   }
 </style>

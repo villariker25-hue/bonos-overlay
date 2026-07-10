@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panel de bonos</title>
 <style>
-  :root{ --dorado:#a78bfa; --fondo:#12101f; --tarjeta:#1e1b30; }
+  /* Colores oficiales: degradado #B377FF → #7133F4, fondo #11091E */
+  :root{ --dorado:#B377FF; --fondo:#11091E; --tarjeta:#1d1233; }
   *{ box-sizing:border-box; }
   body{
     margin:0; min-height:100vh; background:var(--fondo);
@@ -55,7 +56,10 @@
   button{
     border:none; border-radius:10px; cursor:pointer; font-size:16px; font-weight:700;
   }
-  #anadir{ background:var(--dorado); color:#171130; padding:12px 18px; }
+  #anadir{
+    background:linear-gradient(135deg,#B377FF,#7133F4);
+    color:#fff; padding:12px 18px;
+  }
   #anadir:active{ transform:scale(.97); }
   #resumen{
     display:flex; justify-content:space-between; align-items:center;
@@ -67,7 +71,10 @@
   li{
     background:var(--tarjeta); border-radius:10px; padding:10px 14px;
     display:flex; align-items:center; gap:10px;
-    border-left:4px solid var(--dorado);
+    border-left:4px solid transparent;
+    background-image:linear-gradient(var(--tarjeta),var(--tarjeta)),
+                     linear-gradient(180deg,#B377FF,#7133F4);
+    background-origin:border-box; background-clip:padding-box,border-box;
   }
   li .n{ flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   li .p{ color:var(--dorado); font-weight:700; white-space:nowrap; }

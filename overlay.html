@@ -86,14 +86,14 @@
     padding: 8px 0;
     will-change: transform;
   }
-  /* Cada "juego" es la lista completa en 2 columnas: suben de dos en dos */
+  /* Cada "juego" es la lista completa en una columna */
   .juego{
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 10px;
   }
   .bono{
-    padding: 9px 12px 9px 15px;
+    padding: 9px 14px 9px 17px;
     border-radius: 10px;
     /* Franja lateral con el degradado oficial sobre fondo #11091E translúcido */
     background-color: var(--fondo-tarjeta);
@@ -102,7 +102,9 @@
     background-repeat: no-repeat;
     border: 1px solid var(--borde);
     min-width: 0;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
   }
+  .bono .texto{ flex: 1; min-width: 0; }
   .bono .nombre{
     display: block;
     color: #f5f3ff; font-size: 16px; font-weight: 600;
@@ -116,8 +118,8 @@
     text-shadow: 0 1px 3px rgba(0,0,0,.7);
   }
   .bono .precio{
-    display: block; margin-top: 2px;
-    color: var(--morado); font-size: 15px; font-weight: 700;
+    color: var(--morado); font-size: 17px; font-weight: 700;
+    white-space: nowrap;
     text-shadow: 0 1px 3px rgba(0,0,0,.7);
   }
 </style>
@@ -161,16 +163,19 @@ function juego(bonos){
     const sep = b.nombre.indexOf(" — ");
     const principal = sep === -1 ? b.nombre : b.nombre.slice(0, sep);
     const variante  = sep === -1 ? null : b.nombre.slice(sep + 3);
+    const texto = document.createElement("div");
+    texto.className = "texto";
     const nombre = document.createElement("span");
     nombre.className = "nombre";
     nombre.textContent = principal;
-    t.appendChild(nombre);
+    texto.appendChild(nombre);
     if (variante){
       const tipo = document.createElement("span");
       tipo.className = "tipo";
       tipo.textContent = variante;
-      t.appendChild(tipo);
+      texto.appendChild(tipo);
     }
+    t.appendChild(texto);
     const precio = document.createElement("span");
     precio.className = "precio";
     precio.textContent = b.precio || "";
